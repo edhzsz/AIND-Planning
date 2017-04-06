@@ -9,7 +9,6 @@ from lp_utils import (
 )
 from my_planning_graph import PlanningGraph
 
-
 class AirCargoProblem(Problem):
     def __init__(self, cargos, planes, airports, initial: FluentState, goal: list):
         """
@@ -125,8 +124,33 @@ class AirCargoProblem(Problem):
             e.g. 'FTTTFF'
         :return: list of Action objects
         """
-        # TODO implement
         possible_actions = []
+
+        # Create a knowledge base with the positive fluents of the state
+        # parameter as the knowledge base clauses
+        fluent_state = decode_state(state, self.state_map)
+
+        kb = PropKB()
+        kb.tell(fluent_state.pos_sentence())
+
+        for action in self.actions_list:
+            is_possible = True
+
+            # all preconditions of the action have to be fulfiled by the state
+            for clause in action.precond_pos:
+                if clause not in kb.clauses:
+                    is_possible = False
+                    break
+
+            # validate that negative precondicions of the action don't exists
+            for clause in action.precond_neg:
+                if clause in kb.clauses:
+                    is_possible = False
+                    break
+
+            if is_possible:
+                possible_actions.append(action)
+
         return possible_actions
 
     def result(self, state: str, action: Action):
