@@ -223,9 +223,45 @@ class AirCargoProblem(Problem):
         carried out from the current state in order to satisfy all of the goal
         conditions by ignoring the preconditions required for an action to be
         executed.
+
+        Every action becomes applicable in every state, and any single goal fluent
+        can be achieved in one step.
+        
+        First, the actions are relaxed by removing all preconditions and all effects
+        except those that are literals in the goal. Then, the minimum number
+        of actions required such that the union of those actions’ effects
+        satisfies the goal are aproximated by the greedy algorithm to solve the
+        set-cover problem.
         '''
-        # TODO implement (see Russell-Norvig Ed-3 10.2.3  or Russell-Norvig Ed-2 11.2)
         count = 0
+
+        relaxed_actions = []
+
+        for action in self.actions_list:
+            action_effects = []
+            # take only the add effects that are in the goal
+            for fluent in action.effect_add:
+                if fluent in self.goal:
+                    action_effects.append(fluent)
+
+            # ignore it if the action does not helps to achieve the goal
+            if len(action_effects) > 0:
+                relaxed_actions.append(action_effects)
+        
+        missing_goals = set(self.goal)
+
+        # while there are goals still not achieved
+        while len(missing_goals) > 0:
+            # calculate the action that satisfy the largest number of unsatisfied goals
+            relaxed_actions_int = [(len(missing_goals.intersection(a)), a) for a in relaxed_actions]
+
+            # take the action that satisfies the maximun number of goals
+            _, selected_action = max(relaxed_actions_int,key=lambda item:item[0])
+
+            relaxed_actions.remove(selected_action)
+            missing_goals = missing_goals.difference(selected_action)
+            count += 1
+
         return count
 
 
