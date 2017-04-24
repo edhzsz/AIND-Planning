@@ -1,7 +1,9 @@
 # Heuristic Analysis
 
 All problems are in the Air Cargo domain.  They have the same action schema defined,
-but different initial states and goals.
+but different initial states and goals. All three problems were solved using three
+different non-heuristic search algorithms and two executions of the A* algorithm
+with two heuristics: _ignore preconditions_ and _planning graph level sum_.
 
 ## Air Cargo Action Schema:
 ```
@@ -52,14 +54,28 @@ Unload(C2, P2, SFO)
 
 | Algorithm                           | Expansions |  Goal Tests |  New Nodes | Plan length | Time elapsed (secods) |
 |-------------------------------------|------------|-------------|------------|-------------|-----------------------|
-| Breadth First Search                |    43      |       56    |    180     |     6       |       0.031616        |
-| Depth First Search                  |    21      |       22    |     84     |    20       |       0.014577        |
-| Uniform Cost Search                 |    55      |       57    |    224     |     6       |       0.039915        |
-| A* Search with Ignore Preconditions |    55      |       57    |    224     |     6       |       0.051789        |
-| A* Search with PG Level Sum         |    11      |       13    |     50     |     6       |       2.085718        |
+| Breadth First Search                |    43      |       56    |    180     |     6       |       0.046311        |
+| Depth First Search                  |    21      |       22    |     84     |    20       |       0.022239        |
+| Uniform Cost Search                 |    55      |       57    |    224     |     6       |       0.049400        |
+| A* Search with Ignore Preconditions |    55      |       57    |    224     |     6       |       0.055052        |
+| A* Search with PG Level Sum         |    11      |       13    |     50     |     6       |       1.373335        |
 
 ### Analysis
 
+From the non-heuristic search algorithms used to solve the planning problem, only
+Depth First Search was not able to get an optimal plan. Breadth First Search did
+less node expansions and goal tests resulting in a slightly smaller execution time
+than Uniform Cost Search.
+Both heuristics arrived at an optimal plan, as expected, and, although the PG Level Sum
+heuristic executed the least goal tests and expanded the least amount of nodes and
+new nodes, it had by far the longest execution time.
+
+It is worth noting that both, the Uniform Cost Search and the Ignore preconditions
+heuristic, expand the same amount of nodes and have the same amount of goal tests
+but the Uniform Cost Search is faster because it does not have to spend extra
+time computing the heuristic value.
+
+The best algorithm for this problem is Bread First Search.
 
 ## Problem 2
 
@@ -99,13 +115,28 @@ Unload(C1, P1, JFK)
 
 | Algorithm                           | Expansions |  Goal Tests |  New Nodes | Plan length | Time elapsed (secods) |
 |-------------------------------------|------------|-------------|------------|-------------|-----------------------|
-| Breadth First Search                |    3343    |     4609    |   30509    |      9      |       13.57252        |
-| Depth First Search                  |     624    |      625    |    5602    |    619      |        3.35698        |
-| Uniform Cost Search                 |    4853    |     4855    |   44041    |      9      |       42.34409        |
-| A* Search with Ignore Preconditions |    4853    |     4855    |   44041    |      9      |      51.630905        |
-| A* Search with PG Level Sum         |      86    |       88    |     841    |      9      |      178.35878        |
+| Breadth First Search                |    3343    |     4609    |   30509    |      9      |      15.329773        |
+| Depth First Search                  |     624    |      625    |    5602    |    619      |       3.827281        |
+| Uniform Cost Search                 |    4853    |     4855    |   44041    |      9      |      52.683208        |
+| A* Search with Ignore Preconditions |    4853    |     4855    |   44041    |      9      |      53.042080        |
+| A* Search with PG Level Sum         |      13    |       15    |     123    |      9      |      30.826120        |
 
 ### Analysis
+
+From the non-heuristic search algorithms used to solve the planning problem, only
+Depth First Search was not able to get an optimal plan. Breadth First Search did
+less node expansions and goal tests resulting in a smaller execution time
+than Uniform Cost Search.
+Both heuristics arrived at an optimal plan, as expected, and the PG Level Sum
+heuristic executed the least goal tests and expanded the least amount of nodes and
+new nodes, and it had a smaller execution time than the Ignore Preconditions heuristic.
+
+Again both, the Uniform Cost Search and the Ignore preconditions
+heuristic, expanded the same amount of nodes and have the same amount of goal tests
+but the Uniform Cost Search was faster by a small margin because it does not have to spend extra
+time computing the heuristic value.
+
+The best algorithm for this problem is, again, Bread First Search.
 
 
 ## Problem 3
@@ -125,7 +156,6 @@ Init(At(C1, SFO) ∧ At(C2, JFK) ∧ At(C3, ATL) ∧ At(C4, ORD)
 ```
 Goal(At(C1, JFK) ∧ At(C3, JFK) ∧ At(C2, SFO) ∧ At(C4, SFO))
 ```
-
 
 ## Optimal plan
 
@@ -150,10 +180,34 @@ Unload(C1, P1, JFK)
 
 | Algorithm                           | Expansions |  Goal Tests |  New Nodes | Plan length | Time elapsed (secods) |
 |-------------------------------------|------------|-------------|------------|-------------|-----------------------|
-| Breadth First Search                |   14663    |    18098    |  129631    |     12      |       92.98073        |
-| Depth First Search                  |     408    |      409    |    3364    |    392      |        1.65374        |
-| Uniform Cost Search                 |   18223    |    18225    |  159618    |     12      |      355.57375        |
-| A* Search with Ignore Preconditions |   18223    |    18225    |  159618    |     12      |     416.610795        |
-| A* Search with PG Level Sum         |     414    |      416    |    3818    |     12      |    1214.164300        |
+| Breadth First Search                |   14663    |    18098    |  129631    |     12      |      110.269349       |
+| Depth First Search                  |     408    |      409    |    3364    |    392      |        1.923002       |
+| Uniform Cost Search                 |   18223    |    18225    |  159618    |     12      |      442.549738       |
+| A* Search with Ignore Preconditions |   18223    |    18225    |  159618    |     12      |      473.942290       |
+| A* Search with PG Level Sum         |      23    |       25    |     209    |     12      |       81.589832       |
 
 ### Analysis
+
+From the non-heuristic search algorithms used to solve the planning problem, only
+Depth First Search was not able to get an optimal plan. Breadth First Search did
+less node expansions and goal tests resulting in a smaller execution time
+than Uniform Cost Search.
+Both heuristics arrived at an optimal plan, as expected, and the PG Level Sum
+heuristic executed the least goal tests and expanded the least amount of nodes and
+new nodes, having the smallest execution time of all the algorithms.
+
+Again both, the Uniform Cost Search and the Ignore preconditions
+heuristic, expanded the same amount of nodes and have the same amount of goal tests
+but the Uniform Cost Search was faster by a small margin because it does not have to spend extra
+time computing the heuristic value.
+
+The best algorithm for this problem is, by far, the A* Search with PG Level Sum.
+
+## Conclusion
+
+For small problems the Bread First Search is the best option as it always finds
+an optimal solution in the fastest way.
+For larger problems the A* Search with PG Level Sum is the best option. In all cases
+this algorithm does the least number of evaluations and expansions but generating
+the Planning Graph is an expensive process so the benefits does not show up until
+the graph becomes large enough.
