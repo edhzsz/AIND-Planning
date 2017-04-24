@@ -201,7 +201,7 @@ def mutexify(node1: PgNode, node2: PgNode):
 class PlanningGraph():
     '''
     A planning graph as described in chapter 10 of the AIMA text. The planning
-    graph can be used to reason about 
+    graph can be used to reason about
     '''
 
     def __init__(self, problem: Problem, state: str, serial_planning=True):
@@ -295,6 +295,14 @@ class PlanningGraph():
             if self.s_levels[level] == self.s_levels[level - 1]:
                 leveled = True
 
+    def check_no_mutex(self, nodes):
+
+        for i in range(0, len(nodes)):
+            for j in range(i + 1, len(nodes)):
+                if nodes[i].is_mutex(nodes[j]):
+                    return False
+        return True
+
     def add_action_level(self, level):
         ''' add an A (action) level to the Planning Graph
 
@@ -304,19 +312,25 @@ class PlanningGraph():
         :return:
             adds A nodes to the current level in self.a_levels[level]
         '''
-        self.a_levels.append(set())
+        previous_s_level = list(self.s_levels[level])
+        new_action_set = set()
 
         # 1. determine what actions to add and create those PgNode_a objects
         for a in self.all_actions:
             pga_node = PgNode_a(a)
-            av_pre_nodes =  self.s_levels[level] & pga_node.prenodes
 
-            if len(av_pre_nodes) == len(pga_node.prenodes):
-                for s in av_pre_nodes:
+            if pga_node.prenodes.issubset(self.s_levels[level]):
+                parent_s_list = [node for node in previous_s_level if node in pga_node.prenodes]
+
+                # Don't add if any parents are already mutex (negation_mutex)
+                if self.check_no_mutex(parent_s_list):
                     # 2. connect the nodes to the previous S literal level
-                    s.children.add(pga_node)
-                    pga_node.parents.add(s)
-                    self.a_levels[level].add(pga_node)
+                    for parent in parent_s_list:
+                        parent.children.add(pga_node)
+                        pga_node.parents.add(parent)
+                    new_action_set.add(pga_node)
+
+        self.a_levels.append(new_action_set)
 
     def add_literal_level(self, level):
         ''' add an S (literal) level to the Planning Graph
@@ -327,22 +341,23 @@ class PlanningGraph():
         :return:
             adds S nodes to the current level in self.s_levels[level]
         '''
-        previous_actions = self.a_levels[level - 1]
-        actions_effects = set()
+        previous_actions = list(self.a_levels[level - 1])
+        actions_effects = []
 
         # every A node in the previous level has a list of S nodes in effnodes that represent the effect
         # produced by the action.  These literals will all be part of the new S level.
-        for a in previous_actions:
-            for ef in actions_effects & a.effnodes:
-                ef.parents.add(a)
-                a.children.add(ef)
+        for i, a in enumerate(previous_actions):
+            for ef in a.effnodes:
+                if ef in actions_effects:
+                    ef_i = actions_effects.index(ef)
+                    actions_effects[ef_i].parents.add(a)
+                    a.children.add(actions_effects[ef_i])
+                else:
+                    ef.parents.add(a)
+                    a.children.add(ef)
+                    actions_effects.append(ef)
 
-            for ef in a.effnodes - actions_effects:
-                ef.parents.add(a)
-                a.children.add(ef)
-                actions_effects.add(ef)
-
-        self.s_levels.append(actions_effects)
+        self.s_levels.append(set(actions_effects))
 
     def update_a_mutex(self, nodeset):
         ''' Determine and update sibling mutual exclusion for A-level nodes
@@ -400,12 +415,18 @@ class PlanningGraph():
         :param node_a2: PgNode_a
         :return: bool
         '''
-        pos_a1 = set(node_a1.action.effect_add)
-        neg_a1 = set(node_a1.action.effect_rem)
-        pos_a2 = set(node_a2.action.effect_add)
-        neg_a2 = set(node_a2.action.effect_rem)
 
-        return len(pos_a1 & neg_a2) > 0 or len(pos_a2 & neg_a1) > 0
+        action1 = node_a1.action
+        action2 = node_a2.action
+        for a in action1.effect_add:
+            if a in action2.effect_rem:
+                return True
+
+        for a in action1.effect_rem:
+            if a in action2.effect_add:
+                return True
+
+        return False
 
     def interference_mutex(self, node_a1: PgNode_a, node_a2: PgNode_a) -> bool:
         '''
@@ -421,13 +442,25 @@ class PlanningGraph():
         :param node_a2: PgNode_a
         :return: bool
         '''
-        pre_a1 = set(node_a1.action.precond_pos)
-        neg_a1 = set(node_a1.action.effect_rem)
-        pre_a2 = set(node_a2.action.precond_pos)
-        neg_a2 = set(node_a2.action.effect_rem)
+        action1 = node_a1.action
+        action2 = node_a2.action
+        for a in action1.effect_add:
+            if a in action2.precond_neg:
+                return True
 
+        for a in action1.effect_rem:
+            if a in action2.precond_pos:
+                return True
 
-        return len(pre_a1 & neg_a2) > 0 or len(pre_a2 & neg_a1) > 0
+        for a in action2.effect_add:
+            if a in action1.precond_neg:
+                return True
+
+        for a in action2.effect_rem:
+            if a in action1.precond_pos:
+                return True
+
+        return False
 
     def competing_needs_mutex(self, node_a1: PgNode_a, node_a2: PgNode_a) -> bool:
         '''
@@ -511,7 +544,8 @@ class PlanningGraph():
         level_sum = 0
 
         for g in self.problem.goal:
-            level_sum += self.__h_level__(g)
+            goal = PgNode_s(g, True)
+            level_sum += self.__h_level__(goal)
 
         return level_sum
 
@@ -519,9 +553,8 @@ class PlanningGraph():
         level = 0
 
         while level < len(self.s_levels):
-            for s in self.s_levels[level]:
-                if s.literal == goal:
-                    return level
+            if goal in self.s_levels[level]:
+                return level
 
             level += 1
 
