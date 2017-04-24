@@ -31,6 +31,7 @@ class AirCargoProblem(Problem):
         self.planes = planes
         self.airports = airports
         self.actions_list = self.get_actions()
+        self.relaxed_actions_list = self.get_relaxed_actions()
 
     def get_actions(self):
         '''
@@ -115,6 +116,33 @@ class AirCargoProblem(Problem):
             return flys
 
         return load_actions() + unload_actions() + fly_actions()
+
+    def get_relaxed_actions(self):
+        '''
+        This method creates the relaxed actions (no preconditions) for all actions.
+        It is computationally expensive to call this method directly;
+        however, it is called in the constructor and the results cached in the
+        `relaxed_actions_list` property.
+
+        Returns:
+        ----------
+        list<Action>
+            list of Action objects
+        '''
+        relaxed_actions = []
+
+        for action in self.actions_list:
+            action_effects = []
+            # take only the add effects that are in the goal
+            for fluent in action.effect_add:
+                if fluent in self.goal:
+                    action_effects.append(fluent)
+
+            # ignore it if the action does not help to achieve the goal
+            if len(action_effects) > 0:
+                relaxed_actions.append(action_effects)
+
+        return relaxed_actions
 
     def actions(self, state: str) -> list:
         """ Return the actions that can be executed in the given state.
@@ -234,21 +262,10 @@ class AirCargoProblem(Problem):
         set-cover problem.
         '''
         count = 0
-
-        relaxed_actions = []
-
-        for action in self.actions_list:
-            action_effects = []
-            # take only the add effects that are in the goal
-            for fluent in action.effect_add:
-                if fluent in self.goal:
-                    action_effects.append(fluent)
-
-            # ignore it if the action does not helps to achieve the goal
-            if len(action_effects) > 0:
-                relaxed_actions.append(action_effects)
-        
         missing_goals = set(self.goal)
+
+        # copy the cached relaxed actions
+        relaxed_actions = list(self.relaxed_actions_list)
 
         # while there are goals still not achieved
         while len(missing_goals) > 0:
@@ -263,7 +280,6 @@ class AirCargoProblem(Problem):
             count += 1
 
         return count
-
 
 def air_cargo_p1() -> AirCargoProblem:
     cargos = ['C1', 'C2']
