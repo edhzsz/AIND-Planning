@@ -26,6 +26,7 @@ class AirCargoProblem(Problem):
         """
         self.state_map = initial.pos + initial.neg
         self.initial_state_TF = encode_state(initial, self.state_map)
+        self.goal_state_TF = encode_state(FluentState(goal, []), self.state_map)
         Problem.__init__(self, self.initial_state_TF, goal=goal)
         self.cargos = cargos
         self.planes = planes
@@ -38,7 +39,8 @@ class AirCargoProblem(Problem):
         This method creates concrete actions (no variables) for all actions in the problem
         domain action schema and turns them into complete Action objects as defined in the
         aimacode.planning module. It is computationally expensive to call this method directly;
-        however, it is called in the constructor and the results cached in the `actions_list` property.
+        however, it is called in the constructor and the results cached in the `actions_list`
+        property.
 
         Returns:
         ----------
@@ -57,15 +59,15 @@ class AirCargoProblem(Problem):
                 for p in self.planes:
                     for a in self.airports:
                         precond_pos = [
-                                        expr("At({}, {})".format(c, a)),
-                                        expr("At({}, {})".format(p, a))
-                                      ]
+                            expr("At({}, {})".format(c, a)),
+                            expr("At({}, {})".format(p, a))
+                            ]
                         precond_neg = []
                         effect_add = [expr("In({}, {})".format(c, p))]
                         effect_rem = [expr("At({}, {})".format(c, a))]
                         load = Action(expr("Load({}, {}, {})".format(c, p, a)),
-                                         [precond_pos, precond_neg],
-                                         [effect_add, effect_rem])
+                                      [precond_pos, precond_neg],
+                                      [effect_add, effect_rem])
                         loads.append(load)
 
             return loads
@@ -81,15 +83,15 @@ class AirCargoProblem(Problem):
                 for p in self.planes:
                     for a in self.airports:
                         precond_pos = [
-                                        expr("In({}, {})".format(c, p)),
-                                        expr("At({}, {})".format(p, a))
-                                      ]
+                            expr("In({}, {})".format(c, p)),
+                            expr("At({}, {})".format(p, a))
+                            ]
                         precond_neg = []
                         effect_add = [expr("At({}, {})".format(c, a))]
                         effect_rem = [expr("In({}, {})".format(c, p))]
                         unload = Action(expr("Unload({}, {}, {})".format(c, p, a)),
-                                         [precond_pos, precond_neg],
-                                         [effect_add, effect_rem])
+                                        [precond_pos, precond_neg],
+                                        [effect_add, effect_rem])
                         unloads.append(unload)
 
             return unloads
@@ -104,8 +106,7 @@ class AirCargoProblem(Problem):
                 for to in self.airports:
                     if fr != to:
                         for p in self.planes:
-                            precond_pos = [expr("At({}, {})".format(p, fr)),
-                                           ]
+                            precond_pos = [expr("At({}, {})".format(p, fr))]
                             precond_neg = []
                             effect_add = [expr("At({}, {})".format(p, to))]
                             effect_rem = [expr("At({}, {})".format(p, fr))]
@@ -158,21 +159,21 @@ class AirCargoProblem(Problem):
         # parameter as the knowledge base clauses
         fluent_state = decode_state(state, self.state_map)
 
-        kb = PropKB()
-        kb.tell(fluent_state.pos_sentence())
+        knowledge_base = PropKB()
+        knowledge_base.tell(fluent_state.pos_sentence())
 
         for action in self.actions_list:
             is_possible = True
 
             # all preconditions of the action have to be fulfiled by the state
             for clause in action.precond_pos:
-                if clause not in kb.clauses:
+                if clause not in knowledge_base.clauses:
                     is_possible = False
                     break
 
             # validate that negative precondicions of the action don't exists
             for clause in action.precond_neg:
-                if clause in kb.clauses:
+                if clause in knowledge_base.clauses:
                     is_possible = False
                     break
 
@@ -221,11 +222,12 @@ class AirCargoProblem(Problem):
         :param state: str representing state
         :return: bool
         """
-        kb = PropKB()
-        kb.tell(decode_state(state, self.state_map).pos_sentence())
+        knowledge_base = PropKB()
+        knowledge_base.tell(decode_state(state, self.state_map).pos_sentence())
         for clause in self.goal:
-            if clause not in kb.clauses:
+            if clause not in knowledge_base.clauses:
                 return False
+
         return True
 
     def h_1(self, node: Node):
@@ -252,32 +254,17 @@ class AirCargoProblem(Problem):
         conditions by ignoring the preconditions required for an action to be
         executed.
 
-        Every action becomes applicable in every state, and any single goal fluent
-        can be achieved in one step.
-        
-        First, the actions are relaxed by removing all preconditions and all effects
-        except those that are literals in the goal. Then, the minimum number
-        of actions required such that the union of those actions’ effects
-        satisfies the goal are aproximated by the greedy algorithm to solve the
-        set-cover problem.
+        As it is assumed in this project that no action can satisfy more than
+        one legal goal, then it is sufficient to calculate many of the goal
+        states are not yet satisfied in the current state.
         '''
         count = 0
-        missing_goals = set(self.goal)
 
-        # copy the cached relaxed actions
-        relaxed_actions = list(self.relaxed_actions_list)
-
-        # while there are goals still not achieved
-        while len(missing_goals) > 0:
-            # calculate the action that satisfy the largest number of unsatisfied goals
-            relaxed_actions_int = [(len(missing_goals.intersection(a)), a) for a in relaxed_actions]
-
-            # take the action that satisfies the maximun number of goals
-            _, selected_action = max(relaxed_actions_int,key=lambda item:item[0])
-
-            relaxed_actions.remove(selected_action)
-            missing_goals = missing_goals.difference(selected_action)
-            count += 1
+        for i, fluent in enumerate(self.state_map):
+            # count number of positive fluents not correct
+            if fluent in self.goal:
+                if node.state[i] == 'F' and self.goal_state_TF[i] == 'T':
+                    count += 1
 
         return count
 
@@ -288,8 +275,8 @@ def air_cargo_p1() -> AirCargoProblem:
     pos = [expr('At(C1, SFO)'),
            expr('At(C2, JFK)'),
            expr('At(P1, SFO)'),
-           expr('At(P2, JFK)'),
-           ]
+           expr('At(P2, JFK)')
+          ]
     neg = [expr('At(C2, SFO)'),
            expr('In(C2, P1)'),
            expr('In(C2, P2)'),
@@ -297,12 +284,12 @@ def air_cargo_p1() -> AirCargoProblem:
            expr('In(C1, P1)'),
            expr('In(C1, P2)'),
            expr('At(P1, JFK)'),
-           expr('At(P2, SFO)'),
-           ]
+           expr('At(P2, SFO)')
+          ]
     init = FluentState(pos, neg)
     goal = [expr('At(C1, JFK)'),
-            expr('At(C2, SFO)'),
-            ]
+            expr('At(C2, SFO)')
+           ]
     return AirCargoProblem(cargos, planes, airports, init, goal)
 
 
@@ -316,9 +303,8 @@ def air_cargo_p2() -> AirCargoProblem:
            expr('At(P1, SFO)'),
            expr('At(P2, JFK)'),
            expr('At(P3, ATL)'),
-           ]
-    neg = [
-           expr('At(C1, JFK)'),
+          ]
+    neg = [expr('At(C1, JFK)'),
            expr('At(C1, ATL)'),
            expr('In(C1, P1)'),
            expr('In(C1, P2)'),
@@ -338,13 +324,14 @@ def air_cargo_p2() -> AirCargoProblem:
            expr('At(P2, SFO)'),
            expr('At(P2, ATL)'),
            expr('At(P3, SFO)'),
-           expr('At(P3, JFK)'),
-           ]
+           expr('At(P3, JFK)')
+          ]
     init = FluentState(pos, neg)
     goal = [expr('At(C1, JFK)'),
             expr('At(C2, SFO)'),
             expr('At(C3, SFO)'),
-            ]
+           ]
+
     return AirCargoProblem(cargos, planes, airports, init, goal)
 
 
@@ -358,9 +345,8 @@ def air_cargo_p3() -> AirCargoProblem:
            expr('At(C4, ORD)'),
            expr('At(P1, SFO)'),
            expr('At(P2, JFK)'),
-           ]
-    neg = [
-           expr('At(C1, JFK)'),
+          ]
+    neg = [expr('At(C1, JFK)'),
            expr('At(C1, ATL)'),
            expr('At(C1, ORD)'),
            expr('In(C1, P1)'),
@@ -386,11 +372,12 @@ def air_cargo_p3() -> AirCargoProblem:
            expr('At(P2, SFO)'),
            expr('At(P2, ATL)'),
            expr('At(P2, ORD)'),
-           ]
+          ]
     init = FluentState(pos, neg)
     goal = [expr('At(C1, JFK)'),
             expr('At(C2, SFO)'),
             expr('At(C3, JFK)'),
             expr('At(C4, SFO)'),
-            ]
+           ]
+
     return AirCargoProblem(cargos, planes, airports, init, goal)

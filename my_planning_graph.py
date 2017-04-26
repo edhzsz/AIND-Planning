@@ -286,22 +286,14 @@ class PlanningGraph():
         # i.e. until it is "leveled"
         while not leveled:
             self.add_action_level(level)
-            self.update_a_mutex(self.a_levels[level])
+            #self.update_a_mutex(self.a_levels[level])
 
             level += 1
             self.add_literal_level(level)
-            self.update_s_mutex(self.s_levels[level])
+            #self.update_s_mutex(self.s_levels[level])
 
             if self.s_levels[level] == self.s_levels[level - 1]:
                 leveled = True
-
-    def check_no_mutex(self, nodes):
-
-        for i in range(0, len(nodes)):
-            for j in range(i + 1, len(nodes)):
-                if nodes[i].is_mutex(nodes[j]):
-                    return False
-        return True
 
     def add_action_level(self, level):
         ''' add an A (action) level to the Planning Graph
@@ -312,23 +304,19 @@ class PlanningGraph():
         :return:
             adds A nodes to the current level in self.a_levels[level]
         '''
-        previous_s_level = list(self.s_levels[level])
+        previous_s_level = self.s_levels[level]
         new_action_set = set()
 
         # 1. determine what actions to add and create those PgNode_a objects
         for a in self.all_actions:
             pga_node = PgNode_a(a)
 
-            if pga_node.prenodes.issubset(self.s_levels[level]):
-                parent_s_list = [node for node in previous_s_level if node in pga_node.prenodes]
-
-                # Don't add if any parents are already mutex (negation_mutex)
-                if self.check_no_mutex(parent_s_list):
-                    # 2. connect the nodes to the previous S literal level
-                    for parent in parent_s_list:
-                        parent.children.add(pga_node)
-                        pga_node.parents.add(parent)
-                    new_action_set.add(pga_node)
+            if pga_node.prenodes.issubset(previous_s_level):
+                # 2. connect the nodes to the previous S literal level
+                for parent in previous_s_level & pga_node.prenodes:
+                    parent.children.add(pga_node)
+                    pga_node.parents.add(parent)
+                new_action_set.add(pga_node)
 
         self.a_levels.append(new_action_set)
 
@@ -344,9 +332,10 @@ class PlanningGraph():
         previous_actions = list(self.a_levels[level - 1])
         actions_effects = []
 
-        # every A node in the previous level has a list of S nodes in effnodes that represent the effect
-        # produced by the action.  These literals will all be part of the new S level.
-        for i, a in enumerate(previous_actions):
+        # every A node in the previous level has a list of S nodes in effnodes that
+        # represent the effect produced by the action.
+        # These literals will all be part of the new S level.
+        for a in previous_actions:
             for ef in a.effnodes:
                 if ef in actions_effects:
                     ef_i = actions_effects.index(ef)
@@ -430,7 +419,7 @@ class PlanningGraph():
 
     def interference_mutex(self, node_a1: PgNode_a, node_a2: PgNode_a) -> bool:
         '''
-        Test a pair of actions for mutual exclusion, returning True if the 
+        Test a pair of actions for mutual exclusion, returning True if the
         effect of one action is the negation of a precondition of the other.
 
         HINT: The Action instance associated with an action node is accessible
@@ -558,4 +547,4 @@ class PlanningGraph():
 
             level += 1
 
-        return -1
+        return 0
